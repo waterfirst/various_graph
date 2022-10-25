@@ -1,0 +1,507 @@
+
+
+rm(list=ls())
+plot.new()
+frame()
+options(warn=-1) # 경고메세지 무시하기
+
+#install.packages("ggpubr")
+library(ggpubr)
+library(dplyr)
+options(warn=-1) # 경고메세지 무시하기
+
+data("ToothGrowth") # 예제 데이터 불러오기
+head(ToothGrowth,4) # 데이터 테이블 확인
+
+#https://partrita.github.io/posts/ggpubr/
+
+
+### 에러바 3종
+
+#1 기술적 오차 막대 : range, sd (표준편차)
+#2 추론적 오차막대 : 표준오차(SE: sd/sqrt(length)), 신뢰구간(CI : 모평균이 존재할 것으로 기대되는 구간 : 95% CI, Mean± 2*SE)
+
+# 참고문헌
+#https://www.ncbi.nlm.nih.gov/pmc/articles/PMC2064100/pdf/jcb1770007.pdf
+
+ggline(ToothGrowth, x = "dose", y = "len", add = "mean_se", # 각각의 축설정 
+       color = "supp", palette = "npg")+  # 색상 설정하기
+  stat_compare_means(aes(group = supp), label = "p.signif", label.y = c(16, 25, 29)) + # 통계적 유의성 표시
+  labs(list(x = 'Dose', y = 'Length', fill = 'Supp')) # 레이블 변경
+
+#ggarrange(a, b, c ,  
+#          labels = c("A", "B", "C"),
+#          ncol = 2, nrow = 2)
+
+################  분포 시각화 ###############
+
+set.seed(1234)
+wdata = data.frame(
+  sex = factor(rep(c("F", "M"), each=200)),
+  weight = c(rnorm(200, 55), rnorm(200, 58)))
+
+
+a1 <- ggdensity(wdata, x = "weight",
+                add = "mean", rug = TRUE, # Density plot with mean lines and marginal rug
+                color = "sex", fill = "sex",  # Change outline and fill colors by groups ("sex")
+                palette = c("#00AFBB", "#E7B800")) # Use custom palette
+
+a2 <- gghistogram(wdata, x = "weight",
+                  add = "mean", rug = TRUE,
+                  color = "sex", fill = "sex",
+                  palette = c("#00AFBB", "#E7B800"))
+
+a3 <- ggdensity(wdata, x = "weight",
+                add = "mean", rug = TRUE,
+                fill = "lightgray")
+
+# Combine histogram and density plots
+a4 <-  gghistogram(wdata, x = "weight",
+                   add = "mean", rug = FALSE,
+                   fill = "sex", palette = c("#00AFBB", "#E7B800"),
+                   add_density = TRUE)
+
+# 한페이지에 넣기
+ggarrange(a1, a2, a3 , a4,
+          labels = c("A", "B", "C", "D"),
+          ncol = 2, nrow = 2)
+
+
+################  box plot, violin 시각화 ###############
+
+data("ToothGrowth")
+df <- ToothGrowth
+head(df, 4)
+# Box plots with jittered points
+p1 <- ggboxplot(df, x = "dose", y = "len",
+                color = "dose", palette =c("#00AFBB", "#E7B800", "#FC4E07"),
+                add = "jitter", shape = "dose")
+
+# Add p-values comparing groups
+my_comparisons <- list( c("0.5", "1"), c("1", "2"), c("0.5", "2") )
+p2 <- p1 + stat_compare_means(comparisons = my_comparisons)+ # Add pairwise comparisons p-value
+  stat_compare_means(label.y = 50)                   # Add global p-value
+
+# Violin plots with box plots inside
+p3 <- ggviolin(df, x = "dose", y = "len", fill = "dose",
+               palette = c("#00AFBB", "#E7B800", "#FC4E07"),
+               add = "boxplot", add.params = list(fill = "white"))+
+  stat_compare_means(comparisons = my_comparisons, label = "p.signif")+ # Add significance levels
+  stat_compare_means(label.y = 50)        # Add global the p-value 
+
+ggarrange(p1, p2, p3,
+          labels = c("A", "B", "C"),
+          ncol = 2, nrow = 2)
+
+
+#####################  간단한 막대 그래프 
+
+
+# example Data
+df <- data.frame(dose=c("D0.5", "D1", "D2"),
+                 len=c(4.2, 10, 29.5))
+df2 <- data.frame(supp=rep(c("VC", "OJ"), each=3),
+                  dose=rep(c("D0.5", "D1", "D2"),2),
+                  len=c(6.8, 15, 33, 4.2, 10, 29.5))
+df2
+df3 <- ToothGrowth
+
+# Change position: Interleaved (dodged) bar plot
+p1 <- ggbarplot(df2, "dose", "len",
+                fill = "supp", color = "supp", palette = "Paired", #하늘색, 청색
+                position = position_dodge(0.8))
+
+# Change fill and outline color add labels inside bars
+p2 <- ggbarplot(df, "dose", "len",
+                fill = "dose", color = "dose",
+                palette = c("#00AFBB", "#E7B800", "#FC4E07"), #청, 황, 적
+                label = TRUE, lab.pos = "in", lab.col = "white")
+
+# Add jitter points and errors (mean_se)
+p3 <- ggbarplot(df3, x = "dose", y = "len",
+                add = c("mean_se", "jitter"))
+
+# Multiple groups with error bars and jitter point
+p4 <- ggbarplot(df3, x = "dose", y = "len", color = "supp",
+                add = "mean_se", palette = c("#00AFBB", "#E7B800"),
+                position = position_dodge(0.8))
+
+ggarrange(p1, p2, p3, p4,
+          labels = c("A", "B", "C", "D"),
+          ncol = 2, nrow = 2)
+
+
+####################  팔레토 차트
+
+
+# 샘플 데이터 불러오기
+data("mtcars")
+dfm <- mtcars
+dfm$cyl <- as.factor(dfm$cyl) # Convert the cyl variable to a factor
+dfm$name <- rownames(dfm) # Add the name colums
+head(dfm[, c("name", "wt", "mpg", "cyl")]) # 데이터 살펴보기
+
+
+
+a1 <- ggbarplot(dfm, x = "name", y = "mpg",
+                fill = "cyl",               # change fill color by cyl
+                color = "white",            # Set bar border colors to white
+                palette = "jco",            # jco journal color palett. see ?ggpar
+                sort.val = "desc",          # Sort the value in dscending order
+                sort.by.groups = FALSE,     # Don't sort inside each group
+                x.text.angle = 90)           # Rotate vertically x axis texts
+
+a2 <- ggbarplot(dfm, x = "name", y = "mpg",
+                fill = "cyl",               # change fill color by cyl
+                color = "white",            # Set bar border colors to white
+                palette = "jco",            # jco journal color palett. see ?ggpar
+                sort.val = "asc",           # Sort the value in dscending order
+                sort.by.groups = TRUE,      # Sort inside each group
+                x.text.angle = 90)           # Rotate vertically x axis texts
+
+ggarrange(a1, a2,
+          labels = c("A", "B"),
+          ncol = 1, nrow = 2)
+
+
+###################  편차 그래프, 평균으로부터 얼마나 차이가 나는지, Z-Score
+
+# Calculate the z-score of the mpg data
+dfm$mpg_z <- (dfm$mpg -mean(dfm$mpg))/sd(dfm$mpg)
+dfm$mpg_grp <- factor(ifelse(dfm$mpg_z < 0, "low", "high"), 
+                      levels = c("low", "high"))
+# Inspect the data
+head(dfm[, c("name", "wt", "mpg", "mpg_z", "mpg_grp", "cyl")])
+
+
+# Create an ordered bar plot, colored according to the level of mpg:
+ggbarplot(dfm, x = "name", y = "mpg_z",
+          fill = "mpg_grp",           # change fill color by mpg_level
+          color = "white",            # Set bar border colors to white
+          palette = "jco",            # jco journal color palett. see ?ggpar
+          sort.val = "desc",          # Sort the value in descending order
+          sort.by.groups = FALSE,     # Don't sort inside each group
+          x.text.angle = 90,          # Rotate vertically x axis texts
+          ylab = "MPG z-score",
+          legend.title = "MPG Group",
+          rotate = TRUE,
+          ggtheme = theme_minimal())
+
+
+
+########### 막대사탕 (Lollipop) 그래프 
+
+ggdotchart(dfm, x = "name", y = "mpg",
+           color = "cyl",                                # Color by groups
+           palette = c("#00AFBB", "#E7B800", "#FC4E07"), # Custom color palette
+           sorting = "descending",                       # Sort value in descending order
+           add = "segments",                             # Add segments from y = 0 to dots
+           rotate = TRUE,                                # Rotate vertically
+           group = "cyl",                                # Order by groups
+           dot.size = 6,                                 # Large dot size
+           label = round(dfm$mpg),                        # Add mpg values as dot labels
+           font.label = list(color = "white", size = 9, 
+                             vjust = 0.5),               # Adjust label parameters
+           ggtheme = theme_pubr())                        # ggplot2 theme
+
+
+##############  도표에 설명 넣기 (논문쓸 때 사용)
+
+#ggparagraph(text, color = NULL, size = NULL, face = NULL, family = NULL,
+#            lineheight = NULL)
+# S3 method for splitText
+#drawDetails(x, recording)
+
+
+
+# Density plot (밀도 그래프)
+density.p <- ggdensity(iris, x = "Sepal.Length",
+                       fill = "Species", palette = "jco")
+# Text plot
+text <- paste("Iris data set gives the measurements in cm",
+              "of the variables sepal length and width",
+              "and petal length and width, respectively,",
+              "for 50 flowers from each of 3 species of iris.",
+              "The species are Iris setosa, versicolor, and virginica.", sep = " ")
+text.p <- ggparagraph(text, face = "italic", size = 12)
+
+# Arrange the plots on the same page
+ggarrange(density.p, text.p,
+          ncol = 1, nrow = 2,
+          heights = c(1, 0.3))
+
+# Data: ToothGrowth data set we'll be used.
+df3 <- ToothGrowth
+# Add error bars: mean_se
+# (other values include: mean_sd, mean_ci, median_iqr, ....)
+# Add labels
+p1 <- ggline(df3, x = "dose", y = "len", add = "mean_se")
+# Add jitter points and errors (mean_se)
+p2 <- ggline(df3, x = "dose", y = "len",
+             add = c("mean_se",'jitter'))
+# Multiple groups with error bars
+p3 <- ggline(df3, x = "dose", y = "len", color = "supp",
+             add = "mean_se", palette = c("#00AFBB", "#FC4E07"))
+
+ggarrange(p1, p2, p3,
+          labels = c("A", "B", "C"),
+          ncol = 2, nrow = 2)
+
+
+########### 히스토그램 + 산포도 2종 그래프
+
+
+# Grouped data
+ggscatterhist(
+  iris, x = "Sepal.Length", y = "Sepal.Width",
+  color = "Species", size = 3, alpha = 0.6,
+  palette = c("#00AFBB", "#E7B800", "#FC4E07"),
+  margin.params = list(fill = "Species", color = "black", size = 0.2))
+
+
+#############  산포도에 상관분석, p-value 추가
+
+# Load data
+data("mtcars")
+df <- mtcars
+df$cyl <- as.factor(df$cyl)
+
+# Scatter plot with correlation coefficient
+sp <- ggscatter(df, x = "wt", y = "mpg",
+                add = "reg.line",  # Add regressin line
+                conf.int = TRUE) # Add confidence interval
+# Add correlation coefficient
+p1 <- sp + stat_cor(method = "pearson", label.x = 3, label.y = 30)
+# Color by groups and facet
+sp <- ggscatter(df, x = "wt", y = "mpg",
+                color = "cyl", palette = "jco",
+                add = "reg.line", conf.int = TRUE)
+p2 <- sp + stat_cor(aes(color = cyl), label.x = 3)
+# Scatter plot with ellipses and group mean points
+p3 <- ggscatter(df, x = "wt", y = "mpg",
+                color = "cyl", shape = "cyl",
+                mean.point = TRUE, ellipse = TRUE)+
+  stat_stars(aes(color = cyl))
+
+ggarrange(p1, p2, p3,
+          labels = c("A", "B", "C"),
+          ncol = 2, nrow = 2)
+
+
+############### 전, 후 그래프 비교, paried data 
+
+# Example data
+before <-c(200.1, 190.9, 192.7, 213, 241.4, 196.9, 172.2, 185.5, 205.2, 193.7)
+after <-c(392.9, 393.2, 345.1, 393, 434, 427.9, 422, 383.9, 392.3, 352.2)
+
+d <- data.frame(before = before, after = after)
+p1 <- ggpaired(d, cond1 = "before", cond2 = "after", width = 0.0,
+               line.color = "gray", line.size = 0.4, palette = "npg")
+p2 <- ggpaired(d, cond1 = "before", cond2 = "after", width = 0.2,
+               line.color = "gray", line.size = 0.4, palette = "aaas")
+p3 <- ggpaired(d, cond1 = "before", cond2 = "after", width = 0.2,
+               line.color = "gray", line.size = 0.4, fill = "condition",palette = "npg")
+ggarrange(p1, p2, p3,
+          labels = c("A", "B", "C"),
+          ncol = 2, nrow = 2)
+
+
+############ p-value 를 박스 그래프에 추가
+
+# Load data
+data("ToothGrowth")
+head(ToothGrowth)
+
+# Two independent groups
+p <- ggboxplot(ToothGrowth, x = "supp", y = "len",
+               color = "supp", palette = "npg", add = "jitter")
+
+#  Add p-value
+p1 <- p + stat_compare_means(method = "t.test")
+
+# Paired samples
+p2 <- ggpaired(ToothGrowth, x = "supp", y = "len",
+               color = "supp", line.color = "gray", line.size = 0.4,
+               palette = "npg")+
+  stat_compare_means(paired = TRUE, method = "t.test")
+
+# More than two groups, Pairwise comparisons: Specify the comparisons you want
+my_comparisons <- list( c("0.5", "1"), c("1", "2"), c("0.5", "2") )
+p3 <- ggboxplot(ToothGrowth, x = "dose", y = "len",
+                color = "dose", palette = "npg")+
+  # Add pairwise comparisons p-value
+  stat_compare_means(comparisons = my_comparisons, label.y = c(29, 35, 40))+
+  stat_compare_means(label.y = 45)     # Add global Anova p-value
+
+# Multiple pairwise test against a reference group
+p4 <- ggboxplot(ToothGrowth, x = "dose", y = "len",
+                color = "dose", palette = "npg")+
+  stat_compare_means(method = "anova", label.y = 40)+ # Add global p-value
+  stat_compare_means(aes(label = ..p.signif..),
+                     method = "t.test", ref.group = "0.5")
+
+ggarrange(p1, p2, p3, p4,  ncol = 2, nrow = 2,
+          labels = c("A", "B","C","D"))
+
+
+# Multiple grouping variables
+p <- ggboxplot(ToothGrowth, x = "supp", y = "len",
+               color = "supp", palette = "npg",
+               add = "jitter",
+               facet.by = "dose", short.panel.labs = FALSE)
+# Use only p.format as label. Remove method name.
+p5 <- p + stat_compare_means(aes(label = paste0("p = ", ..p.format..)))
+p5
+
+
+
+#############  테이블로 통계 분석 
+
+# Load data
+data("ToothGrowth")
+df <- ToothGrowth
+
+
+# One-sample test
+compare_means(len ~ 1, df, mu = 0)
+
+
+# Two-samples unpaired test
+compare_means(len ~ supp, df)
+
+
+# Two-samples paired test
+compare_means(len ~ supp, df, paired = TRUE)
+
+
+# Compare supp levels after grouping the data by "dose"
+compare_means(len ~ supp, df, group.by = "dose")
+
+
+# pairwise comparisons
+# As dose contains more thant two levels ==>
+# pairwise test is automatically performed.
+compare_means(len ~ dose, df)
+
+
+# Comparison against reference group
+compare_means(len ~ dose, df, ref.group = "0.5")
+
+# Comparison against all
+compare_means(len ~ dose, df, ref.group = ".all.")
+
+# Anova test
+compare_means(len ~ dose, df, method = "anova")
+
+# kruskal.test
+compare_means(len ~ dose, df, method = "kruskal.test")
+
+
+########### table
+library(moonBook) #문건우 교수 만듦
+data(acs)
+#Sys.setlocale(category="LC_ALL", locale="UTF-8")
+
+mytable(Dx~LDLC, data=acs) #DX 진단, LDLC : 수치
+
+## 진단에 따른 LCLC와 당뇨 유무 
+mytable(Dx~LDLC+DM, data=acs)
+
+## 진단에 따른 LCLC와 당뇨 유무 
+mytable(Dx~LDLC+DM+TG+DM, data=acs)
+
+mytable(Dx ~., data=acs)
+
+mytable(Dx+DM ~., data=acs)
+
+mycsv(mytable(sex+DM~., data=acs),file='test1.csv')
+mycsv(mytable(sex+DM~age+Dx, data=acs),file='test2.csv')
+myhtml(mytable(sex+DM~., data=acs))
+myhtml(mytable(sex+DM~age+Dx, data=acs))
+
+require(stringr)
+require(magrittr)
+mytable(acs) %>% compress
+mytable(Dx~.,data=acs) %>% compress
+
+require(moonBook)
+data(acs)
+densityplot(age~Dx,data=acs)
+
+require(survival)
+data(cancer)
+fit=coxph(Surv(time,status)~age+sex+obstruct+perfor,data=colon)
+extractHR(fit)
+
+require(ggplot2)
+mapping=aes(colour=sex)
+getMapping(mapping,"colour")
+getMapping(mapping,"x")
+
+
+library(stargazer)
+stargazer(mtcars,title="Description statistics", digit=2, type="html", out = "cars.html")
+stargazer(mtcars,title="Description statistics", 
+          digit=2, type="html", out = "cars1.html",
+          flip=T)
+
+
+
+
+library(webshot)
+webshot::install_phantomjs()
+webshot("cars1.html", "cars1.png")
+
+
+#회귀분석 테이블 
+data(mtcars)
+attach(mtcars)
+
+
+
+gear <- factor(gear)
+highmpg <- factor(mpg>mean(mpg))
+am <- factor(am)
+ma <- lm(mpg ~ disp, data = mtcars)
+mb <- lm(mpg ~ disp+drat, data = mtcars)
+mc <- lm(mpg ~ disp+drat+gear, data = mtcars)
+md <- glm(highmpg ~ disp+drat+am,family=binomial(link = "logit"), data = mtcars)
+
+summary(ma)
+summary(mb)
+summary(mc)
+summary(md)
+
+#논문표 작성 
+stargazer(ma,mb,mc,md,title="Model comparison", type="html", out = "lm.html")
+webshot("lm.html", "lm.png",
+        vwidth = 992,
+        vheight = 744, cliprect = NULL, selector = NULL, expand = NULL,
+        delay = 0.2, zoom = 20, eval = NULL, debug = FALSE,
+        useragent = NULL)
+
+#표 수정 
+stargazer(ma,mb,mc,md,title="Model comparison", type="html", out = "lm2.html",
+          dep.var.labels = c("Miles per gallon", "High MPG car"),
+          covariate.labels=c("Displacement","Rear axle ratio","Four gears","Five gears", "Transmission(M=1)"),
+          omit.stat=c("LL","ser"),no.space=T)
+#LL =Log Likelihood, ser= Residual standard error
+#dep.var.labels= 가로 부분 
+#  covariate.labels 세로 부분 
+
+
+library(magick)
+dir()
+frink <- image_read("lm.png")
+
+
+############## 그래프, 표에 캡션 넣기
+
+library(gapminder)
+
+top_gap <- head(gapminder)
+
+knitr::kable(top_gap)
+
+knitr::kable(top_gap,
+             caption = "The first 6 rows of the dataset, gapminder")
